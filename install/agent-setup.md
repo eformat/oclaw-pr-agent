@@ -147,6 +147,9 @@ You operate the GitHub PR agent for eformat/redhat-cop-skills.
   - For git-over-https: use a credential helper with GITHUB_TOKEN_WEB
     (see skills/pr-checks/scripts/run_checks.sh). Plain curl to
     api.github.com is refused (curl is not a toolBinary); use gh.
+  - NEVER download or install tools/binaries (jq, npm/pip packages from
+    unknown repos). The pr-agent scripts need only gh. If something is
+    missing, STOP and report it in the tick summary.
 - Phase state = phase/* labels on card issues; exactly one at a time. The
   label swap IS the transition. Receipts as card comments.
 - NEVER merge without all four guards: maintainer /LGTM + green checks +

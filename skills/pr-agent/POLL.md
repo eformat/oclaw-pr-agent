@@ -6,14 +6,17 @@ tick self-heals on the next one.
 ## 0. Preflight
 
 ```bash
-command -v gh jq || exit 1          # binaries
-git rev-parse --show-toplevel       # we are at the oclaw-pr-agent repo root
+command -v gh || exit 1             # gh only — scripts use gh's embedded jq (--jq)
+git rev-parse --show-toplevel 2>/dev/null || true   # repo root (after clone below)
 echo "LIVE=${OCLAW_PR_LIVE:-0}"     # default dry-run; live only when the tick sets it
 ```
 
+**Never download or install tools/binaries to fill a gap** (no jq tarballs, no
+npm/pip installs of unknown packages). The scripts need only `gh`; if a binary
+is genuinely missing, STOP and report it in the tick summary.
+
 If the repo is missing from the workspace, clone it — with the WEB destination
-token when running in the OCE sandbox (private or future-private repo), plain
-otherwise:
+token when running in the OCE sandbox (works for private too), plain otherwise:
 
 ```bash
 if [ -n "${GITHUB_TOKEN_WEB:-}" ]; then

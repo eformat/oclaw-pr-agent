@@ -28,3 +28,6 @@ Conventions for AI agents (and humans) working in this repository.
    state in files; re-read from GitHub every tick.
 6. **One PR claimed per tick** (see `OCLAW_PR_MAX_CLAIM`), max 2 concurrent
    per-PR sessions.
+7. **Never download or install tools/binaries** (no jq tarballs, no npm/pip
+   installs from unknown repos). Scripts require only `gh` (embedded jq);
+   anything else missing → stop and report.

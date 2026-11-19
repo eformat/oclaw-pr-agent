@@ -4,6 +4,9 @@
 # Dry-run by default: mutations print the gh command instead of running it.
 # Set OCLAW_PR_LIVE=1 to perform mutations. Read-only commands always run.
 #
+# NOTE: requires ONLY gh (embedded jq via --jq) — no system jq. Never
+# download/install tools to compensate for missing binaries; report instead.
+#
 # Usage:
 #   pr_card.sh find <pr-url>              -> "<issue-number> <state>" or nothing
 #   pr_card.sh show <issue-number>        -> card JSON (read-only)
@@ -27,7 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export GH_TOKEN="${GITHUB_TOKEN_API:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
-for bin in gh jq; do command -v "$bin" >/dev/null 2>&1 || die "$bin is required"; done
+command -v gh >/dev/null 2>&1 || die "gh is required"
 
 cmd="${1:-}"; shift || true
 [ -n "$cmd" ] || die "usage: pr_card.sh <find|show|create|set-phase|comment|close> [args]"
@@ -69,20 +72,21 @@ case "$cmd" in
     n="$(pr_num "$pr")"
     existing="$("$SCRIPT_DIR/pr_card.sh" find "$(gh pr view "$n" --repo "$REPO" --json url --jq .url)")" || existing=""
     if [ -n "$existing" ]; then printf 'card exists: %s\n' "$existing"; exit 0; fi
-    meta="$(gh pr view "$n" --repo "$REPO" \
-      --json title,url,author,createdAt,headRefName,baseRefName,isDraft)"
-    title="$(printf '%s' "$meta" | jq -r --arg n "$n" '"PR agent: #" + $n + " " + .title')"
-    body="$(printf '%s' "$meta" | jq -r '
-      "PR: " + .url + "\n" +
-      "Author: @" + .author.login + "\n" +
-      "Opened: " + .createdAt + "\n" +
-      "Branch: `" + .headRefName + "` → `" + .baseRefName + "`" +
-      (if .isDraft then "\n**Draft PR**" else "" end) + "\n\n" +
-      "## Phase checklist\n" +
-      "- [ ] Backlog — triage\n- [ ] Doing — checks\n" +
-      "- [ ] Review — /LGTM\n- [ ] Done — merged\n\n" +
-      "_Managed by the oclaw-pr-agent automation. Maintainers: comment `/LGTM` to " +
-      "approve merge, `/cancel` to abandon._')"
+    # title + body built entirely inside gh --jq (no system jq)
+    title="$(gh pr view "$n" --repo "$REPO" --json number,title \
+      --jq '"PR agent: #" + (.number | tostring) + " " + .title')"
+    body="$(gh pr view "$n" --repo "$REPO" \
+      --json url,author,createdAt,headRefName,baseRefName,isDraft \
+      --jq '("PR: " + .url + "\n"
+              + "Author: @" + .author.login + "\n"
+              + "Opened: " + .createdAt + "\n"
+              + "Branch: `" + .headRefName + "` → `" + .baseRefName + "`"
+              + (if .isDraft then "\n**Draft PR**" else "" end) + "\n\n"
+              + "## Phase checklist\n"
+              + "- [ ] Backlog — triage\n- [ ] Doing — checks\n"
+              + "- [ ] Review — /LGTM\n- [ ] Done — merged\n\n"
+              + "_Managed by the oclaw-pr-agent automation. Maintainers: comment `/LGTM` to "
+              + "approve merge, `/cancel` to abandon._')"
     mutate gh issue create --repo "$REPO" --label phase/backlog \
       --title "$title" --body-file - <<< "$body"
     ;;

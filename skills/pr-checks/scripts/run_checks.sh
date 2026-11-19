@@ -22,29 +22,27 @@ WORKDIR="${OCLAW_PR_WORKDIR:-${TMPDIR:-/tmp}/oclaw-pr-agent}"
 export GH_TOKEN="${GITHUB_TOKEN_API:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
-for bin in gh jq git; do command -v "$bin" >/dev/null 2>&1 || die "$bin is required"; done
+for bin in gh git; do command -v "$bin" >/dev/null 2>&1 || die "$bin is required"; done
+# NOTE: requires ONLY gh (embedded jq via --jq) — no system jq. Never
+# download/install tools to compensate for missing binaries; report instead.
 
 pr="${1:?usage: run_checks.sh <pr-number>}"
 pr="$(printf '%s' "$pr" | grep -oE '[0-9]+$')"
 
-meta="$(gh pr view "$pr" --repo "$REPO" \
-  --json title,url,author,headRefName,headRefOid,baseRefName,additions,deletions,changedFiles,isDraft)"
-
-title="$(printf '%s' "$meta" | jq -r .title)"
-head_oid="$(printf '%s' "$meta" | jq -r .headRefOid)"
+head_oid="$(gh pr view "$pr" --repo "$REPO" --json headRefOid --jq .headRefOid)"
 short_oid="${head_oid:0:12}"
 
 printf '### 🤖 Checks @ `%s`\n\n' "$short_oid"
 printf '| field | value |\n|---|---|\n'
-while IFS=$'\t' read -r k v; do printf '| %s | %s |\n' "$k" "$v"; done < <(
-  printf '%s' "$meta" | jq -r '[
-    ["PR", "#'"$pr"'"],
-    ["Title", .title],
-    ["Author", "@" + .author.login],
-    ["Branch", "`" + .headRefName + "` → `" + .baseRefName + "`"],
-    ["Diff", (.changedFiles | tostring) + " files, +" + (.additions | tostring) + "/-" + (.deletions | tostring)],
-    ["Draft", (.isDraft | tostring)]
-  ] | .[] | @tsv')
+gh pr view "$pr" --repo "$REPO" \
+  --json title,author,headRefName,baseRefName,additions,deletions,changedFiles,isDraft \
+  --jq '[["PR", "#'"$pr"'"],
+        ["Title", .title],
+        ["Author", "@" + .author.login],
+        ["Branch", "`" + .headRefName + "` → `" + .baseRefName + "`"],
+        ["Diff", (.changedFiles | tostring) + " files, +" + (.additions | tostring) + "/-" + (.deletions | tostring)],
+        ["Draft", (.isDraft | tostring)]] | .[] | @tsv' |
+while IFS=$'\t' read -r k v; do printf '| %s | %s |\n' "$k" "$v"; done
 
 # ---------- CI checks (remote, always) ----------
 printf '\n#### CI (Skills CI)\n\n'
