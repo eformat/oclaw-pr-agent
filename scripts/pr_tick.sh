@@ -52,7 +52,7 @@ issues_tsv="$(gh issue list --repo "$REPO" --state all --limit 300 \
   --json number,title,body,state,url,labels,createdAt \
   --jq '.[]
     | select(any(.labels[]?; (.name // "") | startswith("phase/")))
-    | [.number | tostring, .state, (.createdAt // ""), (.body // "")] | @tsv')" \
+    | [(.number | tostring), .state, (.createdAt // ""), (.body // "")] | @tsv')" \
   || die "gh issue list failed — check gh auth / egress"
 
 open_pr_urls="$(printf '%s\n' "$prs_tsv" | awk -F'\t' '{print $3}')"
@@ -121,7 +121,7 @@ claimed_count=0
 # backlog cards: state open + label phase/backlog, oldest first.
 backlog_tsv="$(gh issue list --repo "$REPO" --state open --limit 100 \
   --label phase/backlog --json number,createdAt,body \
-  --jq 'sort_by(.createdAt) | .[] | [.number | tostring, .createdAt, (.body // "")] | @tsv')"
+  --jq 'sort_by(.createdAt) | .[] | [(.number | tostring), .createdAt, (.body // "")] | @tsv')"
 while IFS=$'\t' read -r bnum bcreated bbody; do
   [ -n "${bnum:-}" ] || continue
   [ "$claimed_count" -lt "$MAX_CLAIM" ] || break
@@ -140,7 +140,7 @@ done <<< "$backlog_tsv"
 printf '\n## Review scan (/LGTM, /cancel, SHA guard)\n'
 review_tsv="$(gh issue list --repo "$REPO" --state open --limit 100 \
   --label phase/review --json number,body \
-  --jq '.[] | [.number | tostring, (.body // "")] | @tsv')"
+  --jq '.[] | [(.number | tostring), (.body // "")] | @tsv')"
 while IFS=$'\t' read -r num body; do
   [ -n "${num:-}" ] || continue
   url="$(printf '%s' "${body:-}" | grep -oE 'https://github\.com/[^ )"]+/pull/[0-9]+' | head -1 || true)"
@@ -196,6 +196,35 @@ while IFS=$'\t' read -r num body; do
       "$prn" "$num" "${head_oid:0:12}"
   fi
 done <<< "$review_tsv"
+
+# ---------- 4b. re-check scan on Doing cards (mechanical) ----------
+# A Doing card needs re-checks when its last `checks @ <sha>` report predates
+# the current head SHA (author pushed) — emitted mechanically so the agent
+# doesn't have to judge. The agent runs skills/pr-checks/SKILL.md inline for
+# each RECHECK finding (and posts a fresh report).
+printf '\n## Re-check scan (Doing cards, head-SHA comparison)\n'
+doing_tsv="$(gh issue list --repo "$REPO" --state open --limit 100 \
+  --label phase/doing --json number,body \
+  --jq '.[] | [(.number | tostring), (.body // "")] | @tsv')"
+while IFS=$'\t' read -r dnum dbody; do
+  [ -n "${dnum:-}" ] || continue
+  url="$(printf '%s' "${dbody:-}" | grep -oE 'https://github\.com/[^ )"]+/pull/[0-9]+' | head -1 || true)"
+  [ -n "$url" ] || continue
+  prn="${url##*/}"
+  head_oid="$(gh pr view "$prn" --repo "$REPO" --json headRefOid --jq .headRefOid)" \
+    || { printf '  warn  PR #%s lookup failed\n' "$prn"; continue; }
+  last_report_sha="$(gh issue view "$dnum" --repo "$REPO" --json comments \
+    --jq '.comments | map(.body) | join("\n")' 2>/dev/null \
+    | grep -oE 'checks @ .[0-9a-f]{7,40}.' | tail -1 | grep -oE '[0-9a-f]{7,40}' || true)"
+  if [ -z "$last_report_sha" ]; then
+    printf '  RECHECK  card #%s (PR #%s): no checks report yet — run pr-checks inline\n' "$dnum" "$prn"
+  elif [ "$head_oid" != "$last_report_sha" ] && [[ "$head_oid" != "$last_report_sha"* ]]; then
+    printf '  RECHECK  card #%s (PR #%s): report %s predates head %s — run pr-checks inline\n' \
+      "$dnum" "$prn" "${last_report_sha:0:12}" "${head_oid:0:12}"
+  else
+    printf '  ok       card #%s (PR #%s): report matches head %s\n' "$dnum" "$prn" "${head_oid:0:12}"
+  fi
+done <<< "$doing_tsv"
 
 # ---------- summary ----------
 printf '\n## Summary\n'
