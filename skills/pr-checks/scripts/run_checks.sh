@@ -16,6 +16,11 @@ REPO="${OCLAW_PR_REPO:-eformat/redhat-cop-skills}"
 LOCAL_LINT="${OCLAW_PR_LOCAL_LINT:-0}"
 WORKDIR="${OCLAW_PR_WORKDIR:-${TMPDIR:-/tmp}/oclaw-pr-agent}"
 
+# OCE credential delivery is per-destination (see scripts/pr_tick.sh):
+# gh REST wants $GITHUB_TOKEN_API; git-over-https to github.com wants
+# $GITHUB_TOKEN_WEB via a credential helper. Local fallbacks: keyring/gh auth.
+export GH_TOKEN="${GITHUB_TOKEN_API:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
+
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 for bin in gh jq git; do command -v "$bin" >/dev/null 2>&1 || die "$bin is required"; done
 
@@ -60,12 +65,25 @@ rm -f "$checks_out"
 local_verdict="skipped (set OCLAW_PR_LOCAL_LINT=1)"
 if [ "$LOCAL_LINT" = "1" ]; then
   scratch="$WORKDIR/pr-$pr"
+  # git-over-https needs the WEB destination token when running in the OCE
+  # sandbox; locally fall back to gh's keyring auth.
+  git_credential_args=()
+  if [ -n "${GITHUB_TOKEN_WEB:-}" ]; then
+    git_credential_args=(
+      -c credential.helper='!f() { printf "username=x-access-token\npassword=%s\n" "$GITHUB_TOKEN_WEB"; }; f'
+    )
+  fi
   if [ -d "$scratch/.git" ]; then
     git -C "$scratch" fetch --force origin "pull/$pr/head" >/dev/null 2>&1
   else
     mkdir -p "$(dirname "$scratch")"
-    gh repo clone "$REPO" "$scratch" -- --depth 50 >/dev/null 2>&1
-    git -C "$scratch" fetch origin "pull/$pr/head" >/dev/null 2>&1
+    if [ ${#git_credential_args[@]} -gt 0 ]; then
+      git "${git_credential_args[@]}" clone --depth 50 "https://github.com/$REPO.git" "$scratch" >/dev/null 2>&1
+      git -C "$scratch" fetch origin "pull/$pr/head" >/dev/null 2>&1
+    else
+      gh repo clone "$REPO" "$scratch" -- --depth 50 >/dev/null 2>&1
+      git -C "$scratch" fetch origin "pull/$pr/head" >/dev/null 2>&1
+    fi
   fi
   git -C "$scratch" checkout --force --detach FETCH_HEAD >/dev/null 2>&1
   lint_log="$(mktemp)"

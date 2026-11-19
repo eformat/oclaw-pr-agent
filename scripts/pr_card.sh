@@ -22,6 +22,10 @@ LIVE="${OCLAW_PR_LIVE:-0}"
 PHASES=(backlog doing review done cancelled)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# OCE credential delivery is per-destination (see pr_tick.sh): gh REST wants
+# $GITHUB_TOKEN_API; local fallbacks keep keyring/single-token setups working.
+export GH_TOKEN="${GITHUB_TOKEN_API:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
+
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 for bin in gh jq; do command -v "$bin" >/dev/null 2>&1 || die "$bin is required"; done
 

@@ -23,6 +23,11 @@ MAINTAINERS="${OCLAW_PR_MAINTAINERS:-eformat,hultzj}"
 MAX_CLAIM="${OCLAW_PR_MAX_CLAIM:-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# OCE credential delivery is per-destination: $GITHUB_TOKEN_API authorizes
+# api.github.com (gh REST), $GITHUB_TOKEN_WEB authorizes github.com (git).
+# Locally (gh keyring / single GITHUB_TOKEN) the fallbacks keep this working.
+export GH_TOKEN="${GITHUB_TOKEN_API:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
+
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 for bin in gh jq; do command -v "$bin" >/dev/null 2>&1 || die "$bin is required"; done
 

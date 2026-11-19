@@ -14,6 +14,7 @@ help:
 
 lint:
 	@set -e; for f in $(SCRIPTS); do bash -n "$$f" && echo "  ok  bash -n $$f"; done
+	@node --check scripts/oce_register_credentials.mjs && echo "  ok  node --check scripts/oce_register_credentials.mjs"
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck $(SCRIPTS) && echo "  ok  shellcheck"; \
 	else \
