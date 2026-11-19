@@ -26,7 +26,17 @@ metadata:
    - `/cancel` comment by a maintainer (`eformat`, `hultzj`) on PR or card;
    - PR state = closed and merged = false;
    - explicit instruction from Mike.
-2. Post the receipt:
+
+2. **If triggered by maintainer `/cancel`: close the PR as well** — a
+   maintainer cancelling means the whole contribution is abandoned, and an
+   open PR with a cancelled card reads as alive:
+
+```bash
+gh pr close <n> --repo eformat/redhat-cop-skills \
+  --comment "Cancelled by pr-agent on maintainer /cancel (card <card-issue>)."
+```
+
+3. Post the receipt:
 
 ```bash
 scripts/pr_card.sh comment <card-issue> <<EOF

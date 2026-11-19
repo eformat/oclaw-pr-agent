@@ -73,9 +73,13 @@ session — do not end the turn yet:
 3. Then end with the tick summary.
 
 Resume semantics (a tick that crashed or ran dry-run mid-cycle leaves a card
-mid-phase): the tick also processes the oldest card already in
-`phase/doing` whose card has **no checks report yet** — pick up where the
-previous tick stopped, using the same inline flow.
+mid-phase): the tick also processes actionable cards left behind, oldest
+first, inline —
+- `phase/doing` card with **no checks report yet** → run `skills/pr-checks/SKILL.md`;
+- `phase/review` card with **no `LGTM-SHA:` marker** on the card → run
+  `skills/pr-review/SKILL.md` (then leave it for maintainer `/LGTM`);
+- `phase/review` card with maintainer `/LGTM` (READY-TO-MERGE from the
+  reconcile) → run `skills/pr-done/SKILL.md`.
 
 For `READY-TO-MERGE` findings: follow `skills/pr-done/SKILL.md` inline as
 well (the merge path is short: guards → merge → receipt).
