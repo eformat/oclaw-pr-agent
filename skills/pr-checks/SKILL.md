@@ -54,6 +54,11 @@ says so when the toolchain is missing).
 
 ## Rules
 
+- **The agent never starts CI** — GitHub runs Skills CI on every push
+  (synchronize re-runs failed jobs automatically). This skill only *observes*
+  status (`gh pr checks`) and reports.
+- Re-check triggers: new head SHA since the last report, or a PENDING verdict
+  to re-observe. A RED card with no new commits is left alone — no spam.
 - Never merge from this skill — Review and the `pr-done` guards own that.
 - Never re-run failing checks in a loop within one session; one pass per tick.
 - Local gate failures are reports, not PR comments (the author sees CI).
