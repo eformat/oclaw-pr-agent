@@ -32,7 +32,7 @@ pr="$(printf '%s' "$pr" | grep -oE '[0-9]+$')"
 head_oid="$(gh pr view "$pr" --repo "$REPO" --json headRefOid --jq .headRefOid)"
 short_oid="${head_oid:0:12}"
 
-printf '### 🤖 Checks @ `%s`\n\n' "$short_oid"
+printf '### 🤖 pr-agent checks @ `%s`\n\n' "$short_oid"
 printf '| field | value |\n|---|---|\n'
 gh pr view "$pr" --repo "$REPO" \
   --json title,author,headRefName,baseRefName,additions,deletions,changedFiles,isDraft \
@@ -45,17 +45,33 @@ gh pr view "$pr" --repo "$REPO" \
 while IFS=$'\t' read -r k v; do printf '| %s | %s |\n' "$k" "$v"; done
 
 # ---------- CI checks (remote, always) ----------
-printf '\n#### CI (Skills CI)\n\n'
+printf '\n#### CI\n\n'
 checks_out="$(mktemp)"
 checks_rc=0
 gh pr checks "$pr" --repo "$REPO" > "$checks_out" 2>&1 || checks_rc=$?
 # gh exit codes: 0 = all passed, 1 = failure, 8 = pending
 if grep -q "no checks reported" "$checks_out"; then
   ci_verdict="PENDING"
-  printf '_no CI checks reported yet (workflows may not have started)_\n'
-elif [ "$checks_rc" = "8" ]; then ci_verdict="PENDING"; elif [ "$checks_rc" = "0" ]; then ci_verdict="GREEN"; else ci_verdict="RED"; fi
-if [ -s "$checks_out" ] && ! grep -q "no checks reported" "$checks_out"; then
-  printf '```\n%s\n```\n' "$(cat "$checks_out")"
+  printf '_No CI checks reported yet (workflows may not have started)._\n'
+elif [ ! -s "$checks_out" ]; then
+  ci_verdict="PENDING"
+  printf '_No CI checks reported._\n'
+else
+  printf '| check | result | elapsed | log |\n|---|---|---|---|\n'
+  while IFS=$'\t' read -r name status elapsed url _; do
+    [ -n "${name:-}" ] || continue
+    icon="⚪"
+    case "$status" in
+      pass) icon="✅" ;;
+      fail) icon="❌" ;;
+      pending*) icon="⏳" ;;
+      skipping) icon="⏭" ;;
+    esac
+    logcell="-"
+    [ -n "${url:-}" ] && logcell="[job]($url)"
+    printf '| %s | %s %s | %s | %s |\n' "$name" "$icon" "$status" "${elapsed:--}" "$logcell"
+  done < "$checks_out"
+  if [ "$checks_rc" = "8" ]; then ci_verdict="PENDING"; elif [ "$checks_rc" = "0" ]; then ci_verdict="GREEN"; else ci_verdict="RED"; fi
 fi
 rm -f "$checks_out"
 
@@ -95,18 +111,21 @@ if [ "$LOCAL_LINT" = "1" ]; then
     local_verdict="skipped (make/Makefile unavailable)"
   fi
   printf '\n#### Local gate (make lint @ %s)\n\n' "$short_oid"
-  printf 'verdict: %s\n\n' "$local_verdict"
-  printf '```\n%s\n```\n' "$(tail -40 "$lint_log")"
+  printf '| gate | result |\n|---|---|\n| local make lint | %s |\n\n' "$local_verdict"
+  printf '<details><summary>local lint output (last 40 lines)</summary>\n\n```\n%s\n```\n\n</details>\n' "$(tail -40 "$lint_log")"
   rm -f "$lint_log"
 fi
+
+# ---------- findings placeholder (agent fills this in) ----------
+printf '\n#### Findings\n\n_(pr-agent: replace this line with factual observations as bullets — contract/layout/frontmatter/PR-template items; delete the section if there are none)_\n'
 
 # ---------- verdict ----------
 printf '\n#### Verdict\n\n'
 if [ "$ci_verdict" = "GREEN" ] && { [ "$local_verdict" = "GREEN" ] || [[ "$local_verdict" == skipped* ]]; }; then
-  printf '**GREEN** — ready for Review (maintainer `/LGTM` required to merge).\n'
+  printf '**✅ GREEN** — checks pass. Card moves to `phase/review`; maintainer `/LGTM` required to merge.\n'
 elif [ "$ci_verdict" = "PENDING" ]; then
-  printf '**PENDING** — CI still running; re-check next tick.\n'
+  printf '**⏳ PENDING** — CI still running; the next tick re-checks. Card stays in `phase/doing`.\n'
 else
-  printf '**RED** (ci=%s local=%s) — changes requested; card stays in Doing.\n' \
+  printf '**❌ RED** (ci=%s, local=%s) — changes requested from the author; card stays in `phase/doing` until checks go green.\n' \
     "$ci_verdict" "$local_verdict"
 fi
