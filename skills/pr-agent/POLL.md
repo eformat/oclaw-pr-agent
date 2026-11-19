@@ -58,25 +58,33 @@ Re-run the tick with `OCLAW_PR_LIVE=1` **only** when this tick is a live tick
 - **head moved** findings — the tick already moved the card back to
   `phase/doing`; spawn a work session to re-run checks.
 
-## 3. Per-PR work session spawn
+## 3. Do the claimed PR's work INLINE in this session
 
-```text
-sessions_spawn {
-  label: "pr-<n>",
-  task: "You are the PR agent work session for PR #<n> (card #<c>) in
-  eformat/redhat-cop-skills. Work from the oclaw-pr-agent repo root.
-  Current phase: <phase>. Read and follow skills/<phase-skill>/SKILL.md.
-  Receipts go to card #<c> via scripts/pr_card.sh comment. Guardrails from
-  skills/pr-agent/SKILL.md apply. Dry-run unless this session was spawned
-  by a live tick."
-}
-```
+**Spawned subagent sessions have NO shell/exec tool in OCE** (children lose
+exec by design — they coordinate, not execute). Do not delegate the work:
+run it in THIS session, which has bash.
 
-Notes:
-- Spawned child sessions cannot manage automations (`automations`/`agents_list`
-  are intrinsically excluded) — that is expected and sufficient.
-- Concurrency: before spawning, list running `pr-*` sessions
-  (`sessions_list`); if 2 are active, defer the spawn to the next tick.
+After the tick claims a card (Summary: `claimed: PR#N`), continue in this
+session — do not end the turn yet:
+
+1. Run `skills/pr-triage/SKILL.md` (triage receipt → card).
+2. Run `skills/pr-checks/SKILL.md` (checks report → card; transition per
+   verdict).
+3. Then end with the tick summary.
+
+Resume semantics (a tick that crashed or ran dry-run mid-cycle leaves a card
+mid-phase): the tick also processes the oldest card already in
+`phase/doing` whose card has **no checks report yet** — pick up where the
+previous tick stopped, using the same inline flow.
+
+For `READY-TO-MERGE` findings: follow `skills/pr-done/SKILL.md` inline as
+well (the merge path is short: guards → merge → receipt).
+
+Spawned sessions are still fine for coordination-only work (they keep
+`sessions_*`/`subagents` tools), but never for running the phase skills.
+
+Concurrency: at most 1 card claimed per tick; if a Doing-phase card is
+already worked (checks report present), leave it and end the tick.
 
 ## 4. Report
 
