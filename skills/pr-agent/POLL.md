@@ -76,6 +76,14 @@ Resume semantics (a tick that crashed or ran dry-run mid-cycle leaves a card
 mid-phase): the tick also processes actionable cards left behind, oldest
 first, inline —
 - `phase/doing` card with **no checks report yet** → run `skills/pr-checks/SKILL.md`;
+- `phase/doing` card whose last `checks @ <sha>` report predates the current
+  head SHA (author pushed new commits) → **re-run `skills/pr-checks/SKILL.md`**
+  (fresh report + receipts; CI itself re-ran on GitHub with the push);
+- `phase/doing` card whose last verdict was **PENDING** → re-observe
+  `gh pr checks`; post a new report only when the verdict changes
+  (PENDING → GREEN/RED), then act on it;
+- `phase/doing` card whose last verdict was **RED with no new commits** →
+  leave it (nothing changed; the author is still working);
 - `phase/review` card with **no `LGTM-SHA:` marker** on the card → run
   `skills/pr-review/SKILL.md` (then leave it for maintainer `/LGTM`);
 - `phase/review` card with maintainer `/LGTM` (READY-TO-MERGE from the

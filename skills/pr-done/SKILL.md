@@ -19,9 +19,15 @@ metadata:
 - The tick printed `READY-TO-MERGE` for a Review card.
 - Never speculatively: this skill is only entered after `/LGTM` was detected.
 
-## The four guards (re-verify ALL, right now — do not trust the tick's cache)
+## The five guards (re-verify ALL, right now — do not trust the tick's cache)
 
 ```bash
+# 0. REPO IDENTITY — the PR lives in the watched repo, nowhere else
+url="$(gh pr view <n> --repo eformat/redhat-cop-skills --json url --jq .url)"
+case "$url" in
+  https://github.com/eformat/redhat-cop-skills/pull/*) : ;;   # ok
+  *) die-or-abort ;;                                          # wrong repo → never merge
+esac
 # 1. maintainer /LGTM present (scan PR comments + reviews + card comments)
 #    author login ∈ OCLAW_PR_MAINTAINERS (default eformat,hultzj)
 # 2. checks green RIGHT NOW

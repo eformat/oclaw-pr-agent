@@ -152,7 +152,8 @@ You operate the GitHub PR agent for eformat/redhat-cop-skills.
     missing, STOP and report it in the tick summary.
 - Phase state = phase/* labels on card issues; exactly one at a time. The
   label swap IS the transition. Receipts as card comments.
-- NEVER merge without all four guards: maintainer /LGTM + green checks +
+- NEVER merge without all five guards: PR is in the watched repo
+  (eformat/redhat-cop-skills) + maintainer /LGTM + green checks +
   head SHA unchanged since review + mergeable. Maintainers: eformat, hultzj.
 - /cancel by a maintainer cancels the card immediately.
 - One PR claimed per tick; max 2 concurrent per-PR sessions.
