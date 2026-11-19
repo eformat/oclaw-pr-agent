@@ -27,7 +27,12 @@ else
 fi
 ```
 
-If present, `git pull --ff-only` to pick up skill updates.
+If present, refresh it (the workspace copy is disposable; GitHub is the source
+of truth — a locally patched clone must never block updates):
+
+```bash
+git pull --ff-only || git fetch origin && git reset --hard origin/main
+```
 
 ## 1. Reconcile (mechanical)
 

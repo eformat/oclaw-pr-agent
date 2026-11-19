@@ -9,7 +9,7 @@
   "wakeMode": "now",
   "payload": {
     "kind": "agentTurn",
-    "message": "PR agent poll tick. (1) If the oclaw-pr-agent repo is absent from the workspace, clone https://github.com/eformat/oclaw-pr-agent (branch main); otherwise git pull --ff-only it. (2) cd into the repo root and follow skills/pr-agent/POLL.md exactly — start with scripts/pr_tick.sh. (3) Dry-run is the default: perform GitHub mutations only when this tick is a live tick. (4) For each READY-TO-MERGE finding, follow skills/pr-done/SKILL.md guards before any merge. (5) End with the tick summary (created / claimed / ready-to-merge / cancelled).",
+    "message": "This tick is LIVE: set OCLAW_PR_LIVE=1 for the tick; GitHub mutations are authorized for eformat/redhat-cop-skills cards only. PR agent poll tick. (1) If the oclaw-pr-agent repo is absent from the workspace, clone https://github.com/eformat/oclaw-pr-agent (branch main); otherwise git pull --ff-only it. (2) cd into the repo root and follow skills/pr-agent/POLL.md exactly — start with scripts/pr_tick.sh. (3) For each READY-TO-MERGE finding, follow skills/pr-done/SKILL.md guards before any merge. (4) End with the tick summary (created / claimed / ready-to-merge / cancelled).",
     "toolsAllow": []
   },
   "delivery": {
